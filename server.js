@@ -4,14 +4,15 @@ const socketIo = require('socket.io');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const db = require('./db');
-const userRoutes = require('./routes/UserRoutes');
-const channelsRoutes = require('./routes/ChannelsRoutes');
+const api = require('./src/api');
+const channelsRoutes = require('./src/ChannelsRoutes');
 
 const app = express();
+const router = express.Router();
 const server = http.createServer(app);
 const io = socketIo(server, {
     cors: {
-        origin: 'http://localhost:3000', // Allow requests from this origin
+        origin: '*', // Allow requests from this origin
         methods: ['GET', 'POST'],
         credentials: true
     }
@@ -19,13 +20,27 @@ const io = socketIo(server, {
 
 app.use(bodyParser.json());
 app.use(cors({
-    origin: 'http://localhost:3000', // Allow requests from this origin
+    origin: '*', // Allow requests from this origin
 }));
 
 app.use(express.static('client/build'));
-app.use('/api/users', userRoutes);
-app.use('/api/channels', channelsRoutes);
+// app.use('/api', api);
+// app.use('/api/channels', channelsRoutes);
+router.post('socket', async (req, res) => {
+    const {channel_id, user_id, message,receiver_channel } = req.body;
+ 
 
+
+    io.to(`channel-${channel_id}`).emit('message', message);
+    //send notification to reviver
+    if(receiver_channel && receiver_channel?.length > 0){
+        console.log("receiver_channel",receiver_channel);
+        for (let index = 0; index < receiver_channel.length; index++) {
+            io.to(`channel-${receiver_channel[index]}`).emit('notification', {type:1,message:"new_message"});
+        }
+    }
+     
+});
 // Handle a new connection
 io.on('connection', (socket) => {
     console.log('New client connected');
