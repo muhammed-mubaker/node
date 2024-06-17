@@ -3,9 +3,6 @@ const http = require('http');
 const socketIo = require('socket.io');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const db = require('./db');
-const api = require('./src/api');
-const channelsRoutes = require('./src/ChannelsRoutes');
 
 const app = express();
 const router = express.Router();
@@ -26,77 +23,41 @@ app.use(cors({
 app.use(express.static('client/build'));
 // app.use('/api', api);
 // app.use('/api/channels', channelsRoutes);
-router.post('socket', async (req, res) => {
-    const {channel_id, user_id, message,receiver_channel } = req.body;
- 
+app.post('/socket', async (req, res) => {
 
-
-    io.to(`channel-${channel_id}`).emit('message', message);
-    //send notification to reviver
-    if(receiver_channel && receiver_channel?.length > 0){
-        console.log("receiver_channel",receiver_channel);
-        for (let index = 0; index < receiver_channel.length; index++) {
-            io.to(`channel-${receiver_channel[index]}`).emit('notification', {type:1,message:"new_message"});
-        }
+    const { channel_id, message, receiver_channel } = req.body;
+    const { key, from } = req.headers;
+    console.log(key);
+    if (key !== "dg_MiOGsulfNyfdD8") {
+        res.send({ code: 0, message: "error" });
     }
-     
+    io.to(`${channel_id}`).emit('message', message);
+    //send notification to reviver
+    res.send({ code: 1, message: "done" });
+
+
 });
 // Handle a new connection
 io.on('connection', (socket) => {
     console.log('New client connected');
 
 
-    // Handle incoming messages
-    socket.on('message', (data) => {
-        const { channel_id, user_id, message,receiver_channel } = data;
 
-        // Insert the message into the database with read_status 2
-        const query = 'INSERT INTO messages (channel_id, user_id, message, read_status) VALUES (?, ?, ?, 2)';
-        db.query(query, [channel_id, user_id, message], (err, results) => {
-            if (err) {
-                console.error('Error storing message:', err);
-                return;
-            }
 
-            // Get the full message object, including the username and timestamp
-            const getMessageQuery = `
-                SELECT messages.id, messages.user_id, messages.message, messages.time_sent, messages.read_status, users.username, messages.channel_id
-                FROM messages
-                JOIN users ON messages.user_id = users.id
-                WHERE messages.id = ?
-            `;
-            db.query(getMessageQuery, [results.insertId], (err, messageResults) => {
-                if (err) {
-                    console.error('Error fetching message:', err);
-                    return;
-                }
-
-                const fullMessage = messageResults[0];
-
-                // Broadcast the message to the specific channel
-                io.to(`channel-${channel_id}`).emit('message', fullMessage);
-                //send notification to reviver
-                if(receiver_channel && receiver_channel?.length > 0){
-                    console.log("receiver_channel",receiver_channel);
-                    for (let index = 0; index < receiver_channel.length; index++) {
-                        io.to(`channel-${receiver_channel[index]}`).emit('notification', {type:1,message:"new_message"});
-                    }
-                }
-            });
-        });
-    });
 
     // Handle joining a channel
-    socket.on('joinChannel', ({ user_id, channel_id }) => {
+    socket.on('joinChannel', ({ channel_id }) => {
         // Join the user to the specific channel room
-        console.log("channel_id",channel_id);
-        socket.join(`channel-${channel_id}`);
+        console.log("channel_id", channel_id);
+        socket.join(`${channel_id}`);
+        io.to(`${channel_id}`).emit('message', { type: 1, message: "new message" });
+
     });
 
-    socket.on('notification', ({ user_id, channel_id,message }) => {
+    socket.on('notification', ({ channel_id, message }) => {
         // Join the user to the specific channel room
-        console.log("channel_id",channel_id);
-        io.to(`channel-${channel_id}`).emit('notification', {type:1, message:"new message"});
+        console.log("channel_idddd", channel_id);
+        io.to(`channel-${channel_id}`).emit('notification', { type: 1, message: "new message" });
     });
 
 
