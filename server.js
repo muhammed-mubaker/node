@@ -34,8 +34,10 @@ app.post('/socket', async (req, res) => {
 
     if (message) {
         io.to(channel_id).emit('message', message);
-        io.to(channel_id).emit('notification', message);
-
+    } 
+    console.log(receiver_channel);
+    if (receiver_channel) {
+        io.to(receiver_channel).emit('notification', message);
     } 
 
      
